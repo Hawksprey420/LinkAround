@@ -7,11 +7,8 @@
     <div>
         <p class="la-eyebrow">Portfolio screen</p>
         <h1 class="la-title">
-            {% if selected_field %}
-                {% for field in fields %}
-                    {% if selected_field == field.id|stringformat:'s' %}{{ field.name }}{% endif %}
-                {% endfor %}
-                portfolios
+            {% if selected_category %}
+                {{ selected_category }} portfolios
             {% else %}
                 All portfolios
             {% endif %}
@@ -48,15 +45,10 @@
                 <option value="{{ value }}" {% if selected_work_arrangement == value %}selected{% endif %}>{{ label }}</option>
             {% endfor %}
         </select>
-        <select name="field" class="la-select">
-            <option value="">All fields</option>
-            {% regroup grouped_fields by category as field_groups %}
-            {% for group in field_groups %}
-                <optgroup label="{{ group.grouper|default:'Other' }}">
-                    {% for field in group.list %}
-                        <option value="{{ field.id }}" {% if selected_field == field.id|stringformat:'s' %}selected{% endif %}>{{ field.name }}</option>
-                    {% endfor %}
-                </optgroup>
+        <select name="category" class="la-select">
+            <option value="">All categories</option>
+            {% for cat in categories %}
+                <option value="{{ cat.category }}" {% if selected_category == cat.category %}selected{% endif %}>{{ cat.category }}</option>
             {% endfor %}
         </select>
         <select name="sort" class="la-select js-auto-submit" title="Sort results" aria-label="Sort results">

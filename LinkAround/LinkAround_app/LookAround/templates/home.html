@@ -137,10 +137,10 @@
             </div>
 
             <div class="field-ribbon">
-                {% for field in fields %}
-                    <a href="{% url 'seeker_list' %}?field={{ field.id }}">{{ field.name }}</a>
+                {% for cat in categories %}
+                    <a href="{% url 'seeker_list' %}?category={{ cat.category|urlencode }}">{{ cat.category }}</a>
                 {% empty %}
-                    <span>Fields will appear after setup</span>
+                    <span>Categories will appear after setup</span>
                 {% endfor %}
             </div>
         </section>

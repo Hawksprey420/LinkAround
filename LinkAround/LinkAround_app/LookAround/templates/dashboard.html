@@ -143,30 +143,30 @@
         <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
                 <p class="la-eyebrow">Portfolios</p>
-                <h2 class="la-card-title mt-1">Folders by field</h2>
+                <h2 class="la-card-title mt-1">Folders by category</h2>
             </div>
-            <span class="la-muted">{{ fields|length }} fields available</span>
+            <span class="la-muted">{{ categories|length }} categories available</span>
         </div>
     </div>
 
     <div class="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {% for field in fields %}
-            <a href="{% url 'seeker_list' %}?field={{ field.id }}" class="la-folder-card">
+        {% for cat in categories %}
+            <a href="{% url 'seeker_list' %}?category={{ cat.category|urlencode }}" class="la-folder-card">
                 <span class="la-folder-thumb">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"></path>
                     </svg>
                 </span>
-                <h3 class="la-row-title">{{ field.name }}</h3>
+                <h3 class="la-row-title">{{ cat.category }}</h3>
                 <div class="mt-2 space-y-1 text-sm text-gray-500">
-                    <p>Added Portfolio: {{ field.public_seeker_count|default:0 }}</p>
+                    <p>Added Portfolio: {{ cat.public_seeker_count|default:0 }}</p>
                 </div>
                 <span class="la-button-secondary mt-auto w-full py-2">View now</span>
             </a>
         {% empty %}
             <div class="la-empty sm:col-span-2 lg:col-span-3 xl:col-span-4">
-                <h3 class="la-card-title">No fields yet</h3>
-                <p class="la-muted mt-2">Default fields will appear after the app initializes.</p>
+                <h3 class="la-card-title">No categories yet</h3>
+                <p class="la-muted mt-2">Default categories will appear after the app initializes.</p>
             </div>
         {% endfor %}
     </div>

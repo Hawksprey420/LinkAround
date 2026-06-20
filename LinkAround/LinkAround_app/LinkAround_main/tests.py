@@ -207,7 +207,7 @@ class RoleAccessTests(TestCase):
 
     def test_recent_activity_is_recorded_for_authenticated_browse(self):
         self.client.force_login(self.employer_user)
-        self.client.get(f"{reverse('seeker_list')}?field={self.field.id}")
+        self.client.get(f"{reverse('seeker_list')}?category={self.field.category}")
         self.assertTrue(
             RecentActivity.objects.filter(
                 user=self.employer_user,

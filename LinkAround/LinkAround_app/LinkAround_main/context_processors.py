@@ -28,13 +28,17 @@ def role_context(request):
         and user.is_active
         and user.is_staff
     )
-    trending_fields = FieldPreference.objects.annotate(
-        public_seekers=Count(
+    trending_categories = (
+        FieldPreference.objects
+        .exclude(category='')
+        .values('category')
+        .annotate(public_seekers=Count(
             'seeker_pool',
             filter=Q(seeker_pool__is_public=True),
             distinct=True,
-        ),
-    ).order_by('-public_seekers', 'name')[:5]
+        ))
+        .order_by('-public_seekers', 'category')[:5]
+    )
     if not user.is_authenticated:
         return {
             'is_seeker': False,
@@ -51,7 +55,7 @@ def role_context(request):
             'has_employer_profile': False,
             'unread_notification_count': 0,
             'recent_activities': [],
-            'trending_fields': trending_fields,
+            'trending_categories': trending_categories,
         }
 
     primary_role = get_primary_role(user)
@@ -83,5 +87,5 @@ def role_context(request):
             user=user,
             role=activity_role,
         )[:5] if activity_role else [],
-        'trending_fields': trending_fields,
+        'trending_categories': trending_categories,
     }

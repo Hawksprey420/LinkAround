@@ -105,12 +105,12 @@
                                         </a>
                                     </li>
                                 {% endfor %}
-                            {% elif trending_fields %}
-                                {% for field in trending_fields %}
+                            {% elif trending_categories %}
+                                {% for cat in trending_categories %}
                                     <li>
-                                        <a href="{% url 'seeker_list' %}?field={{ field.id }}" class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-theme-sm text-gray-600 hover:bg-white/10">
+                                        <a href="{% url 'seeker_list' %}?category={{ cat.category|urlencode }}" class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-theme-sm text-gray-600 hover:bg-white/10">
                                             <span class="h-3 w-3 rounded-sm border border-gray-300 bg-white"></span>
-                                            <span class="truncate">{{ field.name }}</span>
+                                            <span class="truncate">{{ cat.category }}</span>
                                         </a>
                                     </li>
                                 {% endfor %}

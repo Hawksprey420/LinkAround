@@ -5,7 +5,7 @@ from django.contrib import messages
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.mail import send_mail
 from django.core.paginator import Paginator
-from django.db.models import Count, Prefetch, Q
+from django.db.models import Count, Q
 from django.http import FileResponse, Http404, HttpResponseForbidden, HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -192,6 +192,22 @@ def ensure_default_fields():
 	)
 
 
+def field_categories_with_counts():
+	return (
+		FieldPreference.objects
+		.exclude(category='')
+		.values('category')
+		.annotate(
+			public_seeker_count=Count(
+				'seeker_pool',
+				filter=Q(seeker_pool__is_public=True),
+				distinct=True,
+			)
+		)
+		.order_by('category')
+	)
+
+
 def ensure_default_regions():
 	if Region.objects.exists():
 		return
@@ -260,13 +276,7 @@ def home(request):
 		employer_profile = related_profile(request.user, 'employer_profile')
 		seeker_profile = related_profile(request.user, 'seeker_profile')
 		context = {
-			'fields': FieldPreference.objects.order_by('category', 'name').annotate(
-				public_seeker_count=Count(
-					'seeker_pool',
-					filter=Q(seeker_pool__is_public=True),
-					distinct=True,
-				),
-			),
+			'categories': field_categories_with_counts(),
 			'employer_profile': employer_profile,
 			'seeker_profile': seeker_profile,
 		}
@@ -285,7 +295,7 @@ def home(request):
 		'seeker_count': SeekerProfile.objects.count(),
 		'employer_count': EmployerProfile.objects.count(),
 		'field_count': FieldPreference.objects.count(),
-		'fields': FieldPreference.objects.order_by('category', 'name')[:8],
+		'categories': field_categories_with_counts(),
 		'featured_seekers': SeekerProfile.objects.filter(is_public=True).select_related('location').prefetch_related('preferred_fields').order_by('-created_at')[:3],
 	}
 	return render(request, 'home.html', context)
@@ -515,22 +525,26 @@ def seeker_list(request):
 		.prefetch_related('preferred_fields')
 		.order_by('-created_at')
 	)
-	fields = FieldPreference.objects.order_by('category', 'name')
+	categories = field_categories_with_counts()
 	regions = Region.objects.order_by('category', 'name')
 
-	field_id = request.GET.get('field')
+	category = request.GET.get('category', '').strip()
 	location_id = request.GET.get('location', '').strip()
 	work_arrangement = request.GET.get('work_arrangement', '').strip()
 	keyword = request.GET.get('q', '').strip()
 	sort = request.GET.get('sort', 'new')
 
+	valid_categories = {row['category'] for row in categories}
 	valid_work_arrangements = {value for value, _label in WORK_ARRANGEMENTS}
 	sort_map = {'new': '-created_at', 'old': 'created_at', 'name': 'full_name'}
 	if sort not in sort_map:
 		sort = 'new'
 
-	if field_id:
-		seekers = seekers.filter(preferred_fields__id=field_id)
+	if category not in valid_categories:
+		category = ''
+
+	if category:
+		seekers = seekers.filter(preferred_fields__category=category)
 	if location_id.isdigit():
 		seekers = seekers.filter(location_id=location_id)
 	if work_arrangement in valid_work_arrangements:
@@ -544,12 +558,10 @@ def seeker_list(request):
 
 	seekers = seekers.order_by(sort_map[sort]).distinct()
 
-	if request.user.is_authenticated and (field_id or location_id or work_arrangement or keyword):
+	if request.user.is_authenticated and (category or location_id or work_arrangement or keyword):
 		activity_label = keyword
-		if field_id:
-			field = fields.filter(pk=field_id).first()
-			if field:
-				activity_label = field.name
+		if category:
+			activity_label = category
 		elif location_id.isdigit():
 			region = regions.filter(pk=location_id).first()
 			if region:
@@ -560,7 +572,7 @@ def seeker_list(request):
 			f'Browsed {activity_label or "portfolio directory"}',
 			request.get_full_path(),
 			{
-				'field': field_id or '',
+				'category': category,
 				'location': location_id,
 				'work_arrangement': work_arrangement,
 				'keyword': keyword,
@@ -574,11 +586,10 @@ def seeker_list(request):
 		'seekers': page_obj.object_list,
 		'page_obj': page_obj,
 		'paginator': paginator,
-		'fields': fields,
-		'grouped_fields': fields,
+		'categories': categories,
 		'regions': regions,
 		'work_arrangements': WORK_ARRANGEMENTS,
-		'selected_field': field_id or '',
+		'selected_category': category,
 		'selected_location': location_id,
 		'selected_work_arrangement': work_arrangement,
 		'selected_keyword': keyword,
@@ -684,33 +695,31 @@ def add_to_shortlist(request, seeker_id):
 	return redirect('employer_dashboard', employer_id=employer.id)
 
 
-def _build_field_folders(employer):
-	"""Group public seekers under each of the employer's covered business fields."""
-	covered_fields = employer.business_fields.order_by('category', 'name')
-	if not covered_fields.exists():
+def _build_category_folders(employer):
+	"""Group public seekers under each category the employer's business fields cover."""
+	covered_categories = list(
+		employer.business_fields
+		.exclude(category='')
+		.values_list('category', flat=True)
+		.distinct()
+		.order_by('category')
+	)
+	if not covered_categories:
 		return []
 
-	seeker_preview = Prefetch(
-		'seeker_pool',
-		queryset=SeekerProfile.objects.filter(is_public=True)
-			.prefetch_related('preferred_fields')
-			.order_by('-created_at'),
-		to_attr='preview_seekers_unbounded',
-	)
-	fields = covered_fields.prefetch_related(seeker_preview).annotate(
-		public_seeker_count=Count(
-			'seeker_pool',
-			filter=Q(seeker_pool__is_public=True),
-			distinct=True,
-		),
-	)
-
 	folders = []
-	for field in fields:
-		preview = getattr(field, 'preview_seekers_unbounded', [])[:FIELD_FOLDER_SEEKER_PREVIEW]
+	for category in covered_categories:
+		seekers_qs = (
+			SeekerProfile.objects
+			.filter(is_public=True, preferred_fields__category=category)
+			.prefetch_related('preferred_fields')
+			.distinct()
+			.order_by('-created_at')
+		)
+		preview = list(seekers_qs[:FIELD_FOLDER_SEEKER_PREVIEW])
 		folders.append({
-			'field': field,
-			'count': field.public_seeker_count,
+			'category': category,
+			'count': seekers_qs.count(),
 			'preview_seekers': preview,
 		})
 	return folders
@@ -811,14 +820,14 @@ def employer_covered_fields(request, employer_id):
 		reverse('employer_covered_fields', kwargs={'employer_id': employer.id}),
 	)
 
-	field_folders = _build_field_folders(employer)
+	category_folders = _build_category_folders(employer)
 
 	return render(
 		request,
 		'employer_covered_fields.html',
 		{
 			'employer': employer,
-			'field_folders': field_folders,
+			'category_folders': category_folders,
 		},
 	)
 
